@@ -5,29 +5,22 @@
 #include <stdio.h> 
 #include <omp.h>
 #include <sys/time.h>
+#include <vector>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 //namespace
 using namespace std;
 //constants and other global variables
-const double e_temp=300; //eviroment temperature
+double ram,lc,m,dens,De,alpha,r0,e_temp,r_cut,redge,dt,tr,tedge;
+string type,output;
+int wcount,N,iter1,iter2,recordtime;
+
 const double k=1.3806505E-23;//Boltzmann constant
-const double lc=4.05E-10;//lattice constant
 const double mol=6.02e23;// atoms per mol
-const double ram=26.98;// relative atomic mass
-const double m=ram/mol/1000; // mass of a atom(kg)
-const double dens=2.7E3; //density (kg/m^3)
 const double PI=3.1415927;
-const double r_cut=4*lc;
-const double dt=1E-15;// delta time(s)
-const double tr=4E-13;
-const double recordtime=1000;// record to txt after every 1000 iteration
-//constants for morse
-const double De=4.32264E-20;
-const double alpha=1.0341E10;
-const double r0=3.4068E-10;
-int wcount=50;
-double redge=wcount*lc;
-double tedge;
 //functions
+void requiredata(int argc,char* argv[]);
 void init(string type,double atoms[], double speeds[], size_t N);
 void maxwell(double maxwells[], double mw_v[] ,int N);
 void edge(double atoms[],double v[],int N);
@@ -37,21 +30,86 @@ void laser(double atoms[],double v[],int N);
 template<typename T> T myabs(T x);
 //main
 int main(int argc,char* argv[]){
-	size_t N=5000;
-	int iter1=100;
-	int iter2=100000;
+	requiredata(argc,argv);
 	size_t SIZE=N*2;
-	string AtomType="AL";//for extension in the future, for now it is useless
+	if(argc<2) return -1;
 	double atomsa[SIZE];
 	double velocity[SIZE];
-	init(AtomType,atomsa, velocity, SIZE);
+	init(type,atomsa, velocity, SIZE);
 	run(atomsa, velocity, SIZE,iter1,iter2);
 	return 0;
 }
 //functions
+
+void requiredata(int argc,char* argv[]){
+	ifstream ainfo;
+	string str(argv[1]);
+	ainfo.open("Atoms/" + str);
+	string s;
+	ainfo>>s;
+	ainfo>>s;
+	ram=stod(s);
+	m=ram/mol/1000;
+	ainfo>>s;
+	ainfo>>s;
+	lc=stod(s);
+	r_cut=4*lc;
+	ainfo>>s;
+	ainfo>>s;
+	dens=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	De=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	alpha=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	r0=stod(s);
+	ainfo>>s;
+	ainfo>>type;
+	ainfo>>s;
+	ainfo>>s;
+	N=stoi(s);
+	ainfo>>s;
+	ainfo>>s;
+	wcount=stoi(s);
+	redge=wcount*lc;
+	ainfo>>s;
+	ainfo>>s;
+	e_temp=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	dt=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	tr=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	recordtime=stod(s);
+	ainfo>>s;
+	ainfo>>s;
+	iter1=stoi(s);
+	ainfo>>s;
+	ainfo>>s;
+	iter2=stoi(s);
+	ainfo>>s;
+	ainfo>>s;
+	output="result/"+s;
+	if(access("result",0)==-1) mkdir("result",0777);
+	if(access(output.c_str(),0)==0) rmdir(output.c_str());
+	mkdir(output.c_str(),0777);
+}
 void init(string type,double atoms[], double speeds[], size_t N){//initialize the model
-	double types[]{0,0,0.5,0.5};
-	size_t size_types=sizeof(types)/sizeof(double);
+	ifstream ainfo;
+	string s;
+	ainfo.open("Types/" + type);
+	vector<double> types;
+	while(ainfo>>s){
+		cout << s << endl;
+		types.push_back(stod(s));
+	}
+	size_t size_types=types.size();
 	int height{};
 	if(wcount%2!=0)
 		--wcount;
@@ -117,9 +175,9 @@ void run(double atoms[],double v[],int N, int iter1,int iter2){//run model
 	}
 	//omp_set_num_threads(4);
 	for(int it=0;it<iter1;it++){
-		
-	struct timeval start_time, stop_time, elapsed_time;  // timers
-	gettimeofday(&start_time,NULL); // Unix timer
+		cout << it << " ";
+	//struct timeval start_time, stop_time, elapsed_time;  // timers
+	//gettimeofday(&start_time,NULL); // Unix timer
 		edge(atoms,v,N);
 		int i;
 		#pragma omp parallel for
@@ -129,15 +187,16 @@ void run(double atoms[],double v[],int N, int iter1,int iter2){//run model
 			acc[i]=0;				
 		}
 		get_acc(atoms,acc,N);
-	gettimeofday(&stop_time,NULL);
-	timersub(&stop_time, &start_time, &elapsed_time); // Unix time subtract routine
-	cout << it <<"  "<< elapsed_time.tv_sec+elapsed_time.tv_usec/1000000.0 << "  ";
+	//gettimeofday(&stop_time,NULL);
+	//timersub(&stop_time, &start_time, &elapsed_time); // Unix time subtract routine
+	//coutcout << it <<"  "<< elapsed_time.tv_sec+elapsed_time.tv_usec/1000000.0 << "  ";
 	}
 	laser(atoms,v,N);
 	for(int it=0;it<iter2;it++){
 		
-	struct timeval start_time, stop_time, elapsed_time;  // timers
-	gettimeofday(&start_time,NULL); // Unix timer
+	//struct timeval start_time, stop_time, elapsed_time;  // timers
+	//gettimeofday(&start_time,NULL); // Unix timer
+		cout << it << " ";
 		edge(atoms,v,N);
 		//cout<< atoms[N-4] << "  " << atoms[N-3] << "  ";
 		int i;
@@ -149,16 +208,17 @@ void run(double atoms[],double v[],int N, int iter1,int iter2){//run model
 		}
 		if(it%100==0){
 				ofstream ainfo;
-				ainfo.open(to_string(it)+" info.txt", ios::out);
+				//cout << " start Recording " << endl;
+				ainfo.open(output+ "/"+to_string(it)+"info.txt", ios::out);
 				for(i=0;i<N;i+=2){
 					ainfo << atoms[i] << atoms[i+1] << v[i] << v[i+1] << endl;
 				}
 				ainfo.close();		
 		}
 		get_acc(atoms,acc,N);
-	gettimeofday(&stop_time,NULL);
-	timersub(&stop_time, &start_time, &elapsed_time); // Unix time subtract routine
-	cout << it <<"  "<< elapsed_time.tv_sec+elapsed_time.tv_usec/1000000.0 << "  ";
+	//gettimeofday(&stop_time,NULL);
+	//timersub(&stop_time, &start_time, &elapsed_time); // Unix time subtract routine
+	//cout << it <<"  "<< elapsed_time.tv_sec+elapsed_time.tv_usec/1000000.0 << "  ";
 	}
 }
 
