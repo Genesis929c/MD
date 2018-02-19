@@ -210,8 +210,8 @@ void run(double atoms[],double v[],int N, int iter1,int iter2){//run model
 				ofstream ainfo;
 				//cout << " start Recording " << endl;
 				ainfo.open(output+ "/"+to_string(it)+"info.txt", ios::out);
-				for(i=0;i<N;i+=2){
-					ainfo << atoms[i] << atoms[i+1] << v[i] << v[i+1] << endl;
+				for(i=0;i<N;i+=2){ 
+					ainfo << atoms[i] << " " << atoms[i+1] << " " << v[i] << " " << v[i+1] << endl;
 				}
 				ainfo.close();		
 		}
