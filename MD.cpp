@@ -1,7 +1,8 @@
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <cmath>
-#include <stdio.h>
+#include <stdio.h> 
 #include <omp.h>
 #include <sys/time.h>
 //namespace
@@ -18,6 +19,7 @@ const double PI=3.1415927;
 const double r_cut=4*lc;
 const double dt=1E-15;// delta time(s)
 const double tr=4E-13;
+const double recordtime=1000;// record to txt after every 1000 iteration
 //constants for morse
 const double De=4.32264E-20;
 const double alpha=1.0341E10;
@@ -44,7 +46,6 @@ int main(int argc,char* argv[]){
 	double velocity[SIZE];
 	init(AtomType,atomsa, velocity, SIZE);
 	run(atomsa, velocity, SIZE,iter1,iter2);
-	cout << "Hello World" << endl;
 	return 0;
 }
 //functions
@@ -120,15 +121,12 @@ void run(double atoms[],double v[],int N, int iter1,int iter2){//run model
 	struct timeval start_time, stop_time, elapsed_time;  // timers
 	gettimeofday(&start_time,NULL); // Unix timer
 		edge(atoms,v,N);
-		//cout<< atoms[N-4] << "  " << atoms[N-3] << "  ";
 		int i;
 		#pragma omp parallel for
-		for(i=0;i<N;i++){//seems less accurate to me, but articles say that it's more accurate.
-			//if(i/2%(2*wcount)!=0 && i/2%(2*wcount)!=2*wcount-1){
+		for(i=0;i<N;i++){
 			v[i]+=acc[i]*dt;
 			atoms[i]+=v[i]*dt;
-			acc[i]=0;
-			//}
+			acc[i]=0;				
 		}
 		get_acc(atoms,acc,N);
 	gettimeofday(&stop_time,NULL);
@@ -144,23 +142,24 @@ void run(double atoms[],double v[],int N, int iter1,int iter2){//run model
 		//cout<< atoms[N-4] << "  " << atoms[N-3] << "  ";
 		int i;
 		#pragma omp parallel for
-		for(i=0;i<N;i++){//seems less accurate to me, but articles say that it's more accurate.
-			//if(i/2%(2*wcount)!=0 && i/2%(2*wcount)!=2*wcount-1){
+		for(i=0;i<N;i++){
 			v[i]+=acc[i]*dt;
 			atoms[i]+=v[i]*dt;
 			acc[i]=0;
-			//}
+		}
+		if(it%100==0){
+				ofstream ainfo;
+				ainfo.open(to_string(it)+" info.txt", ios::out);
+				for(i=0;i<N;i+=2){
+					ainfo << atoms[i] << atoms[i+1] << v[i] << v[i+1] << endl;
+				}
+				ainfo.close();		
 		}
 		get_acc(atoms,acc,N);
 	gettimeofday(&stop_time,NULL);
 	timersub(&stop_time, &start_time, &elapsed_time); // Unix time subtract routine
 	cout << it <<"  "<< elapsed_time.tv_sec+elapsed_time.tv_usec/1000000.0 << "  ";
 	}
-	
-	//swap acc and acc_t
-	//cout <<acc[1] <<endl;
-	//cout <<acc_t[1] <<endl;
-	
 }
 
 void get_acc(double atoms[],double acc[], int N){	//calculate the acceleration by morse potential
@@ -172,8 +171,6 @@ void get_acc(double atoms[],double acc[], int N){	//calculate the acceleration b
 			double acc_all,acc_x,acc_y,d_x,d_y,distance;
 			for(int i=nstart;i<N;i+=step){
 			for(int j=i+2;j<N;j+=2){
-				//reduce calculation,way faster
-				//with 25*25*2 atoms, about 10 times faster with almost the same result
 				d_y=atoms[i+1]-atoms[j+1];
 				if(d_y > r_cut ||d_y < -r_cut)
 					continue;
